@@ -1,0 +1,55 @@
+# Rust build artifacts
+/target/
+
+# Debian packaging
+debian-package/
+*.deb
+
+# Docker
+Dockerfile
+
+# Build outputs
+output/
+*.tar.gz
+
+# Binary artifacts
+proxmox-wake-on-joystick
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.#*
+\#*\#
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Cache directories
+.cache/
+node_modules/
+
+# Backup files
+*.bak
+*.backup

@@ -1,0 +1,26 @@
+[Unit]
+Description=Proxmox Wake-on-Joystick Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart={{BINARY_PATH}}
+Restart=always
+RestartSec=10
+Environment=PROXMOX_VM_ID={{VM_ID}}
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxmox-wake-on-joystick
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=false
+ProtectHome=true
+ReadWritePaths=/dev /var /run /proc /sys
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

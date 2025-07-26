@@ -1,0 +1,114 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bullseye
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install system dependencies
+      run: |
+        apt-get update
+        apt-get install -y curl build-essential pkg-config libudev-dev dpkg-dev
+    
+    - name: Install Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: debian-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          debian-cargo-
+    
+    - name: Run quality checks and build
+      run: |
+        . $HOME/.cargo/env
+        make check build
+    
+    - name: Create Debian package
+      run: |
+        . $HOME/.cargo/env
+        # Get version from git tag or use default
+        if echo "${GITHUB_REF}" | grep -q "refs/tags/"; then
+            VERSION=$(echo "${GITHUB_REF}" | sed 's|refs/tags/v||')
+        else
+            VERSION="0.1.0-dev"
+        fi
+        echo "Building with VERSION=$VERSION"
+        make package-deb VERSION=$VERSION
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: proxmox-wake-on-joystick-deb
+        path: proxmox-wake-on-joystick_*.deb
+        retention-days: 30
+        
+    - name: Generate release body
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        VERSION_TAG="${{ github.ref_name }}"
+        VERSION_NUM="${VERSION_TAG#v}"
+        cat > release_body.md << EOF
+        ## Proxmox Wake-on-Joystick Release
+        
+        ### Installation
+        \`\`\`bash
+        # Download the .deb package
+        wget https://github.com/victor9999/proxmox-wake-on-joystick/releases/download/${VERSION_TAG}/proxmox-wake-on-joystick_${VERSION_NUM}_amd64.deb
+        
+        # Install the package
+        sudo dpkg -i proxmox-wake-on-joystick_${VERSION_NUM}_amd64.deb
+        
+        # Configure VM ID (edit the service file)
+        sudo nano /etc/systemd/system/proxmox-wake-on-joystick.service
+        # Change: Environment=PROXMOX_VM_ID=100 to your VM ID
+        
+        # Enable and start the service
+        sudo systemctl enable proxmox-wake-on-joystick
+        sudo systemctl start proxmox-wake-on-joystick
+        \`\`\`
+        
+        ### Uninstall
+        \`\`\`bash
+        sudo apt remove proxmox-wake-on-joystick
+        \`\`\`
+        
+        ### Requirements
+        - Proxmox VE host
+        - Root access for installation
+        - Compatible gamepad/joystick
+        EOF
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: proxmox-wake-on-joystick_*.deb
+        token: ${{ github.token }}
+        body_path: release_body.md
+        generate_release_notes: true
